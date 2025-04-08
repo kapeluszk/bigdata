@@ -123,7 +123,7 @@ public class AvgFifaPlayers extends Configured implements Tool {
                 double averageAge = sumAge / count;
 
                 // Formatowanie wszystkich 3 wartości jako ciąg znaków
-                resultValue.set(String.format("%.2f,%.2f,%d", averageWage, averageAge, count));
+                resultValue.set(String.format(";%.2f;%.2f;%d", averageWage, averageAge, count));
                 context.write(key, resultValue);
 
             } catch (Exception e) {
