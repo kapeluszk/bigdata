@@ -22,7 +22,7 @@ FIELDS TERMINATED BY ';'
 STORED AS TEXTFILE
 LOCATION '${hiveconf:input_dir4}';
 
--- processing data + jason output
+-- processing data + json output
 WITH joined_data AS (
     SELECT
         TRIM(ls.league_id) AS league_id,
@@ -51,7 +51,7 @@ SELECT CONCAT(
     '"league_level": ', league_level, ', ',
     '"avg_wage": ', avg_wage, ', ',
     '"avg_age": ', avg_age, ', ',
-    '"count_players": ', count_players, ', ',
+    '"count_players": ', count_players,
     '}'
 ) AS json_output
 FROM ranked_leagues

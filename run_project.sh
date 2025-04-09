@@ -19,7 +19,13 @@ LOCAL_OUTPUT=result.json
 hadoop fs -rm -r $MR_OUTPUT
 hadoop fs -rm -r $FINAL_OUTPUT
 
-/user/kacper_grzelak456/input
+# ====FILE PREPARATION====
+echo "Preparing files..."
+unzip zestaw6.zip
+hadoop fs -mkdir -p input
+hadoop fs -put -f zestaw6/input /
+hadoop fs -rm -r zestaw6.zip
+
 # ====MAPREDUCE====
 echo "Running MapReduce job..."
 hadoop jar $JAR_FILE $DATASOURCE1 $MR_OUTPUT
@@ -27,6 +33,19 @@ if [ $? -ne 0 ]; then
     echo "MapReduce job failed."
     exit 1
 fi
+
+# ====CLEAN MAPREDUCE OUTPUT====
+echo "Cleaning MapReduce output..."
+files=$(hadoop fs -ls $MR_OUTPUT | grep "part-" | awk '{print $8}')
+
+for file in $files; do
+    temp_file=$(basename $file)_temp
+
+    hadoop fs -cat $file | sed 's/\t//g' > $temp_file
+    hadoop fs -put -f $temp_file $file
+
+    rm $temp_file
+done
 
 # ====HIVE====
 echo "Running Hive script..."
