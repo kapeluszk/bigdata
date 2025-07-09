@@ -1,0 +1,5 @@
+pyspark
+pandas
+protobuf
+requests
+matplotlib
