@@ -1,8 +1,8 @@
 import os
+import time
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import when, count, desc, col, avg
+from pyspark.sql.functions import when, count, desc, col, avg, current_timestamp
 from process_gtfs_rt import find_latest_file, create_df, parse_gtfs_rt
-from delta.tables import *
 
 def process_gtfs(spark: SparkSession):
 
@@ -33,27 +33,42 @@ def process_gtfs(spark: SparkSession):
         when(col("route_short_name").cast("int") < 100, "tram").otherwise("bus")
     )
 
+    result = result.withColumn(
+        "timestamp",
+        current_timestamp()
+    )
+
     return result
 
-def save_to_delta(df, path="data/processed/gtfs"):
-    """
-    Save the DataFrame to Delta format.
-    """
-    delta_table = delta.tables.DeltaTable.forPath(spark, path)
-    if delta_table.isEmpty():
-        df.write.format("delta").mode("overwrite").save(path)
-    else:
-        df.write.format("delta").mode("append").save(path)
 
+def save_to_iceberg(df, table_name):
+    """
+    Save DataFrame to an Iceberg table.
+    :param df: DataFrame to save
+    :param table_name: Name of the Iceberg table
+    """
+    if spark.catalog.tableExists(table_name):
+        df.write.format("iceberg") \
+            .mode("append") \
+            .option("write-distribution-mode", "hash") \
+            .partitionBy("timestamp") \
+            .save(table_name)
+    else:
+        df.write.format("iceberg") \
+            .mode("overwrite") \
+            .option("write-distribution-mode", "hash") \
+            .partitionBy("timestamp") \
+            .save(table_name)
 
 if __name__ == "__main__":
     spark = SparkSession.builder \
-        .appName("Poznan ZTM") \
+        .appName("Iceberg Example") \
         .master("local[*]") \
-        .config("spark.jars.packages", "io.delta:delta-core_2.12:0.8.0") \
-        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
-        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
+        .config("spark.jars.packages", "org.apache.iceberg:iceberg-spark-runtime-3.2_2.12:1.2.0") \
+        .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkCatalog") \
+        .config("spark.sql.catalog.spark_catalog.type", "hadoop") \
+        .config("spark.sql.catalog.spark_catalog.warehouse", "data/processed") \
         .getOrCreate()
     gtfs_data = process_gtfs(spark)
     gtfs_data.show()
-    save_to_delta(gtfs_data, "data/processed/gtfs")
+    save_to_iceberg(gtfs_data, "spark_catalog.default.gtfs_data")
